@@ -1,7 +1,7 @@
-# RFDD-SRD benchmark code
+# RFS-SRD benchmark code
 
 
-This repository contains the final code used for the RFDD-SRD benchmark experiments. It reproduces the leakage-aware internal five-fold cross-validation and the independent external real-world evaluation reported in the manuscript. Plotting and manuscript-generation scripts are intentionally excluded.
+This repository contains the final code used for the RFS-SRD benchmark experiments. It reproduces the leakage-aware internal five-fold cross-validation and the independent external real-world evaluation reported in the manuscript. Plotting and manuscript-generation scripts are intentionally excluded.
 
 ## Evaluated detectors
 
@@ -36,7 +36,7 @@ Torchvision provides the first three implementations. Ultralytics provides RT-DE
 | `train_cv.py` | Trains one model, fold, and seed and saves validation/test predictions. |
 | `run_cv.py` | Schedules the complete cross-validation grid over one or more GPUs. |
 | `evaluate_cv.py` | Selects thresholds on validation folds and computes out-of-fold metrics and group-bootstrap confidence intervals. |
-| `train_full_and_test_real.py` | Trains on all RFDD-SRD images using CV-frozen epochs and thresholds, then evaluates the independent real set. |
+| `train_full_and_test_real.py` | Trains on all RFS-SRD images using CV-frozen epochs and thresholds, then evaluates the independent real set. |
 | `evaluate_external.py` | Aggregates repeated external-test results and computes source-group bootstrap confidence intervals. |
 | `evaluate_external_cv.py` | Shared detection metrics plus optional frozen-CV-checkpoint external evaluation. |
 | `predict.py` | Runs inference with any released checkpoint using a unified EXIF-normalized image loader. |
@@ -67,43 +67,28 @@ GPU training is expected. The code was validated on Linux with NVIDIA GPUs. The 
 
 ## Dataset layout
 
-RFDD-SRD and the external real dataset use YOLO-format text labels:
+RFS-SRD and the external real dataset use YOLO-format text labels:
 
 ```text
-RFDD_SRD_ROOT/
+RFS_SRD/
 ├── images/
 │   └── <image>.(png|jpg|jpeg|bmp|tif|tiff)
 └── labels/
     └── <image>.txt
-
-REAL_ROOT/
-├── images/
-├── labels/
-└── classes.txt        # optional; one class name per line in the order above
 ```
 
 Each annotation row is `class_id center_x center_y width height`, with coordinates normalized to `[0, 1]`.
 
-The image filename must retain the RFDD-SRD source/template identifier used by `prepare_group_cv.py`. The final release contains 100 images arranged into 50 two-image source/template groups, with ten groups for each damage category.
+The image filename must retain the RFS-SRD source/template identifier used by `prepare_group_cv.py`. The final release contains 100 images arranged into 50 two-image source/template groups, with ten groups for each damage category.
 
 ## 1. Audit the datasets
 
-```bash
-python audit_dataset.py \
-  --rfdd-root /path/to/RFDD_SRD_ROOT \
-  --real-root /path/to/REAL_ROOT \
-  --output artifacts/dataset_audit.json
-```
+
 
 The command fails on missing labels and reports malformed or out-of-range boxes. Review the `issues` arrays before training.
 
 ## 2. Prepare leakage-aware five-fold splits
 
-```bash
-python prepare_group_cv.py \
-  --source /path/to/RFDD_SRD_ROOT \
-  --output artifacts/cv
-```
 
 The default mode creates symbolic links to avoid duplicating the images. Add `--copy-images` on systems where symbolic links are unavailable. Each fold contains 60 training, 20 validation, and 20 test images. All images from the same source/template group remain in one partition within a fold.
 
@@ -142,7 +127,7 @@ python evaluate_cv.py \
 
 The evaluator chooses an operating threshold independently for each model, seed, and outer fold by maximizing macro-F1 on that fold's validation subset. Test-fold predictions remain untouched until final scoring.
 
-## 4. Train on all RFDD-SRD images and test the real set
+## 4. Train on all RFS-SRD images and test the real set
 
 Prepare the full-data protocol and freeze the median CV thresholds:
 
@@ -191,7 +176,7 @@ python predict.py \
 ```
 
 Replace `--model` and `--weights` with the corresponding entries in `weights/checkpoint_manifest.csv` for the other architectures.
-By default, `predict.py` uses the RFDD-SRD-validation operating threshold recorded for that released checkpoint. Pass `--score-threshold` only when a different deployment operating point is required.
+By default, `predict.py` uses the RFS-SRD-validation operating threshold recorded for that released checkpoint. Pass `--score-threshold` only when a different deployment operating point is required.
 
 ## Metrics and statistical protocol
 
@@ -222,6 +207,6 @@ Verify downloaded checkpoints against `weights/checkpoint_manifest.csv` before i
 - The three fixed seeds are `20260908`, `20260909`, and `20260910`.
 - Deterministic PyTorch and Ultralytics execution is requested. Exact bitwise equality can still depend on GPU model, CUDA, cuDNN, and library builds.
 - The released weights provide one ready-to-use checkpoint per architecture. Reproducing the repeated paper results requires running all three seeds.
-- The dataset itself is not duplicated in this code package. Use the released RFDD-SRD dataset and preserve its filenames and class order.
+- The dataset itself is not duplicated in this code package. Use the released RFS-SRD dataset and preserve its filenames and class order.
 
 If this code or the accompanying dataset is used in published work, please cite the RFDD-SRD data description paper.
