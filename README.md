@@ -1,212 +1,158 @@
-# RFS-SRD benchmark code
+# RFS-SRD
 
+**Rail Fastener State Standard Reference Dataset**
 
-This repository contains the final code used for the RFS-SRD benchmark experiments. It reproduces the leakage-aware internal five-fold cross-validation and the independent external real-world evaluation reported in the manuscript. Plotting and manuscript-generation scripts are intentionally excluded.
+Code and reference results for the six-detector internal fivefold benchmark on RFS-SRD. The implementation covers fixed data splits, training, validation-based checkpoint selection, validation/test inference, and common detection metrics.
 
-## Evaluated detectors
+## Dataset download
 
-The same six-class label space is used by all models:
+Download the data separately from **[ScienceDB (DOI: 10.57760/sciencedb.35426)](https://doi.org/10.57760/sciencedb.35426)**.
 
-| Class ID | Fastener state |
-|---:|---|
-| 0 | Deformed |
-| 1 | Displaced |
-| 2 | Fractured |
-| 3 | Inverted |
-| 4 | Missing |
-| 5 | Normal |
+The dataset contains 500 images at 2048 x 2048 pixels, with one damaged fastener and five normal fasteners per image: 3,000 annotated instances in total. The five damage categories each contain 100 images. There are 250 damage-template groups, each represented by two images.
 
-The benchmark includes six representative detectors:
+Dataset images, bounding-box annotations, model checkpoints, and plotting scripts are not stored in this repository. The split manifests contain filenames and template-group identifiers for reproducing the experiments.
 
-- Faster R-CNN with ResNet-50 FPN V2
-- RetinaNet with ResNet-50 FPN V2
-- FCOS with ResNet-50 FPN
-- RT-DETR-L
-- YOLO11m
-- YOLOv10m
+## Class IDs
 
-Torchvision provides the first three implementations. Ultralytics provides RT-DETR-L, YOLO11m, and YOLOv10m. Every detector is initialized from generic COCO-pretrained weights and then trained on RFDD-SRD.
+Use the class order below, which matches `classes.txt` in the current dataset release.
 
-## Repository contents
+| ID | State | Instances |
+|---:|---|---:|
+| 0 | Normal | 2500 |
+| 1 | Deformed | 100 |
+| 2 | Inverted | 100 |
+| 3 | Fractured | 100 |
+| 4 | Missing | 100 |
+| 5 | Displaced | 100 |
 
-| Path | Purpose |
-|---|---|
-| `audit_dataset.py` | Checks image-label pairing, class IDs, box ranges, counts, dimensions, source groups, and duplicate image hashes. |
-| `prepare_group_cv.py` | Builds the source/template-group-disjoint five-fold split and its audit manifests. |
-| `train_cv.py` | Trains one model, fold, and seed and saves validation/test predictions. |
-| `run_cv.py` | Schedules the complete cross-validation grid over one or more GPUs. |
-| `evaluate_cv.py` | Selects thresholds on validation folds and computes out-of-fold metrics and group-bootstrap confidence intervals. |
-| `train_full_and_test_real.py` | Trains on all RFS-SRD images using CV-frozen epochs and thresholds, then evaluates the independent real set. |
-| `evaluate_external.py` | Aggregates repeated external-test results and computes source-group bootstrap confidence intervals. |
-| `evaluate_external_cv.py` | Shared detection metrics plus optional frozen-CV-checkpoint external evaluation. |
-| `predict.py` | Runs inference with any released checkpoint using a unified EXIF-normalized image loader. |
-| `results/internal_cv/` | Final internal five-fold metrics. |
-| `results/external_real/` | Final EXIF-normalized external real-world metrics. |
-| `weights/` | [Download the released model checkpoints](https://aistudio.baidu.com/dataset/detail/397725/file). |
+## Repository layout
+
+```text
+RFS-SRD/
+  README.md
+  LICENSE
+  CHANGELOG.md
+  classes.txt
+  benchmark/
+    README.md
+    requirements.txt
+    prepare_cv.py
+    train_cv.py
+    run_cv.py
+    predict_cv.py
+    model_loader.py
+    evaluate_cv.py
+    metrics.py
+    manifests/
+    reference_results/
+```
+
+The dataset archive also includes `benchmark/`. Both copies implement the same experiment; choose one code location when running commands.
 
 ## Environment
 
-The reported experiments used:
+The reported experiment used Linux, Python 3.9.23, PyTorch 2.1.0, Torchvision 0.16.0, CUDA 12.1, Ultralytics 8.4.51, NumPy 1.26.4, and Pillow 11.3.0. Training requires a CUDA GPU. Exact environment and COCO initialization-weight checksums are recorded in [training_environment.json](benchmark/manifests/training_environment.json).
 
-- Python 3.9.23
-- PyTorch 2.1.0
-- Torchvision 0.16.0
-- Ultralytics 8.4.51
-- CUDA 12.1
-
-Create a clean environment and install a CUDA-compatible PyTorch build before installing the remaining requirements. For the original environment:
+Example installation for the recorded CUDA environment:
 
 ```bash
-python -m venv .venv
+python3.9 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu121
+python -m pip install -r benchmark/requirements.txt
 ```
 
-GPU training is expected. The code was validated on Linux with NVIDIA GPUs. The bootstrap evaluators use multiprocessing and are most reliable on Linux.
+## Prepare the experiment
 
-## Dataset layout
-
-RFS-SRD and the external real dataset use YOLO-format text labels:
+Extract the ScienceDB archive outside this Git checkout. Preserve its filenames and structure:
 
 ```text
-RFS_SRD/
-├── images/
-│   └── <image>.(png|jpg|jpeg|bmp|tif|tiff)
-└── labels/
-    └── <image>.txt
+/path/to/data/RFS-SRD/
+  images/
+  labels/
+  classes.txt
+  notes.json
+  metadata/
+    image_manifest.csv
+    template_groups.csv
 ```
 
-Each annotation row is `class_id center_x center_y width height`, with coordinates normalized to `[0, 1]`.
-
-The image filename must retain the RFS-SRD source/template identifier used by `prepare_group_cv.py`. The final release contains 100 images arranged into 50 two-image source/template groups, with ten groups for each damage category.
-
-## 1. Audit the datasets
-
-
-
-The command fails on missing labels and reports malformed or out-of-range boxes. Review the `issues` arrays before training.
-
-## 2. Prepare leakage-aware five-fold splits
-
-
-The default mode creates symbolic links to avoid duplicating the images. Add `--copy-images` on systems where symbolic links are unavailable. Each fold contains 60 training, 20 validation, and 20 test images. All images from the same source/template group remain in one partition within a fold.
-
-## 3. Run internal cross-validation
-
-Run one job:
+Run the following commands from the repository root:
 
 ```bash
-python train_cv.py \
-  --root artifacts/cv \
-  --model yolo11m \
-  --fold 0 \
-  --seed 20260908 \
-  --device 0
+export CUBLAS_WORKSPACE_CONFIG=:4096:8
+export OMP_NUM_THREADS=4
+python benchmark/prepare_cv.py --dataset /path/to/data/RFS-SRD --output artifacts/cv
 ```
 
-Run the complete grid across available GPUs:
+Preparation creates an experiment-local dataset symlink and materializes the fixed split manifests. Linux is recommended for this workflow.
+
+## Train and evaluate
+
+Run all six architectures, five folds, and three seeds (90 training tasks):
 
 ```bash
-python run_cv.py \
-  --root artifacts/cv \
-  --gpus 0,1,2,3 \
-  --models yolo11m,yolov10m,rtdetr_l,fasterrcnn_r50_fpn_v2,retinanet_r50_fpn_v2,fcos_r50_fpn
+python benchmark/run_cv.py --root artifacts/cv --gpus 0
+python benchmark/evaluate_cv.py --root artifacts/cv --workers 4
 ```
 
-Ultralytics can download its generic pretrained checkpoints automatically. For an offline system, place `yolo11m.pt`, `yolov10m.pt`, and `rtdetr-l.pt` in one directory and pass `--pretrained-dir /path/to/pretrained` to either training command.
+For multiple GPUs, provide physical IDs, for example `--gpus 0,1,2,3,4,5,7`. The launcher skips completed tasks. `--models yolo11m,yolov10m` and `--seeds 20261112` select a training subset; the aggregate evaluator requires the complete 90-task experiment.
 
-After all jobs finish, calculate the reported out-of-fold results:
+Run one training task:
 
 ```bash
-python evaluate_cv.py \
-  --root artifacts/cv \
-  --bootstrap 2000 \
-  --bootstrap-seed 20260908
+python benchmark/train_cv.py --root artifacts/cv --model yolo11m --fold 0 --seed 20261112 --device 0
 ```
 
-The evaluator chooses an operating threshold independently for each model, seed, and outer fold by maximizing macro-F1 on that fold's validation subset. Test-fold predictions remain untouched until final scoring.
+| Model | CLI identifier | Implementation |
+|---|---|---|
+| Faster R-CNN | `fasterrcnn_r50_fpn_v2` | Torchvision ResNet-50 FPN V2 |
+| RetinaNet | `retinanet_r50_fpn_v2` | Torchvision ResNet-50 FPN V2 |
+| FCOS | `fcos_r50_fpn` | Torchvision ResNet-50 FPN |
+| RT-DETR-L | `rtdetr_l` | Ultralytics |
+| YOLO11m | `yolo11m` | Ultralytics |
+| YOLOv10m | `yolov10m` | Ultralytics |
 
-## 4. Train on all RFS-SRD images and test the real set
+All models use generic COCO initialization. Ultralytics resolves `yolo11m.pt`, `yolov10m.pt`, and `rtdetr-l.pt`; use `--pretrained-dir /path/to/coco_weights` to supply local files. Torchvision uses its official pretrained-weight cache/download mechanism. Training saves the selected checkpoint and validation/test predictions under `artifacts/cv/runs/<model>/fold_<fold>_seed_<seed>/`.
 
-Prepare the full-data protocol and freeze the median CV thresholds:
+## Inference with existing checkpoints
+
+Regenerate predictions for the fixed validation or held-out test subset:
 
 ```bash
-python train_full_and_test_real.py \
-  --cv-root artifacts/cv \
-  --real-root /path/to/REAL_ROOT \
-  --prepare
+python benchmark/predict_cv.py --root artifacts/cv --model yolo11m --fold 0 --seed 20261112 --split val --device 0
+python benchmark/predict_cv.py --root artifacts/cv --model yolo11m --fold 0 --seed 20261112 --split test --device 0
+python benchmark/evaluate_cv.py --root artifacts/cv --workers 4
 ```
 
-Run every model with each of the three reported seeds. Example:
+Use `--checkpoint /path/to/checkpoint.pt` for a compatible checkpoint in another location. The checkpoint must use the class IDs above. Inference exports original-image `xyxy` coordinates and low-confidence candidates for AP; the evaluator applies the validation-selected threshold for operating metrics.
 
-```bash
-python train_full_and_test_real.py \
-  --cv-root artifacts/cv \
-  --real-root /path/to/REAL_ROOT \
-  --model yolo11m \
-  --seed 20260908 \
-  --device 0
-```
+## Evaluation protocol
 
-The external images are used only after training. They are not used for optimization, epoch selection, checkpoint selection, or threshold selection. All frameworks receive pixels after `PIL.ImageOps.exif_transpose`, ensuring that predictions and annotations share the same coordinate frame.
+- Five template-group-disjoint folds: 300 training, 100 validation, and 100 test images per fold, with 60/20/20 images from each damage category. Adjacent pairs within a category share a template and remain together. Every image is tested once per seed. Background-source provenance limits are recorded in [split_audit.json](benchmark/manifests/split_audit.json).
+- Seeds: `20261112`, `20261113`, and `20261114`. Input dimensions: 640 x 640.
+- Torchvision detectors: 30 epochs, batch size 8. YOLO/RT-DETR: up to 100 epochs, patience 20; batch size 16 for YOLO and 8 for RT-DETR. These are the reported architecture-specific training settings.
+- Checkpoint selection uses validation data. A separate confidence threshold for each model/fold/seed maximizes validation macro-F1 over 0.01 to 0.99; ties favor the higher threshold.
+- Precision, Recall, and F1 use class-aware, score-ordered one-to-one matching at IoU 0.50. AP uses 101-point interpolation; AP50-95 averages IoU 0.50:0.05:0.95.
+- Miss rate is FN/(TP+FN). False-alarm proportion is FP/(TP+FP), not FP/(FP+TN). FPPI is total false positives across classes per image. A class with no predictions receives zero precision; its undefined false-alarm proportion is excluded from that metric's class-macro average.
+- Class-macro metrics are averaged over five folds per seed, then over three seeds. F1 SD is the sample standard deviation of the three seed-level means. FPPI uses all classes jointly.
 
-Aggregate the three-seed external results:
+## Reference internal results
 
-```bash
-python evaluate_external.py \
-  --cv-root artifacts/cv \
-  --real-root /path/to/REAL_ROOT \
-  --exp-root artifacts/cv/full_train_real_test \
-  --bootstrap 2000 \
-  --bootstrap-seed 20260909
-```
+| Model | Precision | Recall | F1 +/- SD | AP50 | AP50-95 | Miss rate | False-alarm proportion | FPPI |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Faster R-CNN | 0.843 | 0.808 | 0.818 +/- 0.005 | 0.845 | 0.743 | 0.192 | 0.157 | 0.363 |
+| RetinaNet | 0.714 | 0.686 | 0.689 +/- 0.009 | 0.721 | 0.662 | 0.314 | 0.286 | 0.546 |
+| FCOS | 0.725 | 0.721 | 0.701 +/- 0.079 | 0.752 | 0.682 | 0.279 | 0.275 | 0.611 |
+| RT-DETR-L | 0.716 | 0.760 | 0.728 +/- 0.273 | 0.754 | 0.708 | 0.240 | 0.214 | 1.313 |
+| YOLO11m | 0.953 | 0.955 | 0.951 +/- 0.012 | 0.961 | 0.934 | 0.045 | 0.047 | 0.079 |
+| YOLOv10m | 0.941 | 0.947 | 0.942 +/- 0.008 | 0.963 | 0.935 | 0.053 | 0.059 | 0.095 |
 
-## 5. Use the released checkpoints
+The machine-readable [reference_results/](benchmark/reference_results/) directory contains fold-, seed-, and class-level metrics, operating thresholds, and evaluation metadata. New evaluations are written to `artifacts/cv/results/`.
 
-The included files are the full-data checkpoints trained with seed `20260908`. For example:
+This release reproduces the internal cross-validation experiment. External real-world training/evaluation is a separate experiment and is not implemented in this code release.
 
-```bash
-python predict.py \
-  --model yolo11m \
-  --weights weights/yolo11m_seed20260908.pt \
-  --images /path/to/images \
-  --output artifacts/yolo11m_predictions.json \
-  --device 0
-```
+## License and citation
 
-Replace `--model` and `--weights` with the corresponding entries in `weights/checkpoint_manifest.csv` for the other architectures.
-By default, `predict.py` uses the RFS-SRD-validation operating threshold recorded for that released checkpoint. Pass `--score-threshold` only when a different deployment operating point is required.
-
-## Metrics and statistical protocol
-
-- Predictions are matched to ground truth class-wise using greedy one-to-one matching in descending confidence order.
-- A detection is correct when its intersection over union is at least 0.50 and the class label is correct.
-- Reported metrics include Precision, Recall, F1, AP50, AP50–95, missed-detection rate, false-discovery rate, and false positives per image.
-- AP follows 101-point interpolation. AP50–95 averages IoU thresholds from 0.50 to 0.95 in increments of 0.05.
-- Internal 95% confidence intervals use 2,000 defect-stratified source/template-group bootstrap replicates.
-- External 95% confidence intervals use 2,000 source/acquisition-group bootstrap replicates.
-- Reported point estimates are averaged across the three independent training seeds.
-
-## Released results and weights
-
-The CSV files under `results/` are the final machine-readable values used for the manuscript tables and class-wise analyses. The external files correspond to the corrected evaluation in which every framework uses the same EXIF-normalized input pixels.
-
-Model checkpoints are large binary files and are tracked through Git LFS. Before publishing this directory:
-
-```bash
-git lfs install
-git lfs track "weights/*.pt"
-git add .gitattributes weights/
-```
-
-Verify downloaded checkpoints against `weights/checkpoint_manifest.csv` before inference.
-
-## Reproducibility notes
-
-- The three fixed seeds are `20260908`, `20260909`, and `20260910`.
-- Deterministic PyTorch and Ultralytics execution is requested. Exact bitwise equality can still depend on GPU model, CUDA, cuDNN, and library builds.
-- The released weights provide one ready-to-use checkpoint per architecture. Reproducing the repeated paper results requires running all three seeds.
-- The dataset itself is not duplicated in this code package. Use the released RFS-SRD dataset and preserve its filenames and class order.
-
-If this code or the accompanying dataset is used in published work, please cite the RFDD-SRD data description paper.
+Project code is distributed under the [MIT license](LICENSE). Third-party frameworks and pretrained weights retain their own licenses. Dataset access and reuse conditions are specified in the ScienceDB record. When using the data, cite [DOI: 10.57760/sciencedb.35426](https://doi.org/10.57760/sciencedb.35426).

@@ -1,0 +1,37 @@
+{
+  "release": "2026-11-12",
+  "images": 500,
+  "ground_truth_instances": 3000,
+  "class_names": [
+    "Normal",
+    "Deformed",
+    "Inverted",
+    "Fractured",
+    "Missing",
+    "Displaced"
+  ],
+  "folds": 5,
+  "seeds": [
+    20261112,
+    20261113,
+    20261114
+  ],
+  "train_val_test_per_fold": [
+    300,
+    100,
+    100
+  ],
+  "input_size": [
+    640,
+    640
+  ],
+  "threshold_selection": "Per-fold validation macro-F1; grid 0.01 to 0.99; ties favor higher threshold.",
+  "matching": "Class-aware score-ordered greedy one-to-one matching; IoU 0.50 for operating metrics.",
+  "prediction_normalization": "Clip xyxy to original 2048x2048 image bounds, remove degenerate boxes, score >= 0.001, at most 100 highest-score predictions per image for all models.",
+  "ap": "101-point interpolated precision; AP50-95 averages IoU thresholds 0.50:0.05:0.95.",
+  "aggregation": "Class-macro metric per fold, equal mean over five folds per seed, then mean and sample SD over three seeds.",
+  "fppi": "Total false positives across all six classes divided by test images; not averaged over classes.",
+  "false_alarm": "Per-class FP/(TP+FP); undefined if no detections. Macro averages exclude undefined values.",
+  "coverage": "Each image has one outer-test prediction per seed.",
+  "external_evaluation": "Not performed in this experiment."
+}

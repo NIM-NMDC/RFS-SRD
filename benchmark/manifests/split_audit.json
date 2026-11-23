@@ -1,0 +1,22 @@
+{
+  "images": 500,
+  "labels": 500,
+  "instances": 3000,
+  "normal_instances": 2500,
+  "damaged_instances": 500,
+  "unique_image_hashes": 500,
+  "template_groups": 250,
+  "templates_per_damage_class": 50,
+  "images_per_template": 2,
+  "template_group_provenance": "Author-confirmed adjacent pairs in each category: 001/002, 003/004, ..., 099/100.",
+  "split_seed": 20261112,
+  "folds": 5,
+  "train_val_test_images": [
+    300,
+    100,
+    100
+  ],
+  "template_group_overlap_within_each_fold": 0,
+  "outer_test_coverage_per_image": 1,
+  "background_grouping": "No source-frame/background provenance manifest was provided; distinct files or hashes do not establish source-frame independence."
+}

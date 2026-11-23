@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train one RFDD-SRD group-CV detector and save validation/test predictions."""
+"""Train one RFS-SRD group-CV detector and save validation/test predictions."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from PIL import Image, ImageOps
 
 
 CV_ROOT = Path("artifacts/cv")
-CLASS_NAMES = ["Deformed", "Displaced", "Fractured", "Inverted", "Missing", "Normal"]
+CLASS_NAMES = ["Normal", "Deformed", "Inverted", "Fractured", "Missing", "Displaced"]
 GENERIC_WEIGHTS: dict[str, str | Path] = {
     "yolo11m": "yolo11m.pt",
     "yolov10m": "yolov10m.pt",
@@ -40,6 +40,7 @@ def set_seed(seed: int) -> None:
     np.random.seed(seed)
     import torch
 
+    torch.set_num_threads(4)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.benchmark = False
@@ -95,13 +96,13 @@ def run_ultralytics(model_name: str, fold: int, seed: int, device: int, run_dir:
     model_class = RTDETR if model_name == "rtdetr_l" else YOLO
     model = model_class(str(weight_path))
     fold_dir = CV_ROOT / "splits" / f"fold_{fold}"
-    batch = 2 if model_name == "rtdetr_l" else 4
+    batch = 8 if model_name == "rtdetr_l" else 16
     start = time.time()
     model.train(
         data=str(fold_dir / "data.yaml"),
         epochs=100,
         patience=20,
-        imgsz=1280,
+        imgsz=640,
         batch=batch,
         device=device,
         workers=4,
@@ -116,6 +117,7 @@ def run_ultralytics(model_name: str, fold: int, seed: int, device: int, run_dir:
         deterministic=True,
         amp=True,
         close_mosaic=10,
+        cache="ram",
         plots=False,
         verbose=False,
     )
@@ -128,7 +130,7 @@ def run_ultralytics(model_name: str, fold: int, seed: int, device: int, run_dir:
         infer_start = time.time()
         results = best_model.predict(
             source=[str(path) for path in paths],
-            imgsz=1280,
+            imgsz=640,
             conf=0.001,
             iou=0.70,
             max_det=100,
@@ -143,11 +145,12 @@ def run_ultralytics(model_name: str, fold: int, seed: int, device: int, run_dir:
         "model": model_name,
         "model_family": "RT-DETR" if model_name == "rtdetr_l" else "YOLO",
         "generic_pretraining": "COCO",
-        "rfdd_srd_training_data_used": True,
+        "rfs_srd_training_data_used": True,
         "fold": fold,
         "seed": seed,
         "device": device,
-        "image_size": 1280,
+        "image_size": 640,
+        "batch_size": batch,
         "epochs_requested": 100,
         "epochs_completed": int(model.trainer.epoch + 1),
         "best_checkpoint": str(best_path),
@@ -353,22 +356,22 @@ def run_torchvision_detector(model_name: str, fold: int, seed: int, device: int,
     generator = torch.Generator().manual_seed(seed)
     train_loader = DataLoader(
         train_dataset,
-        batch_size=2,
+        batch_size=8,
         shuffle=True,
         num_workers=4,
         collate_fn=collate,
         generator=generator,
         persistent_workers=True,
     )
-    val_loader = DataLoader(val_dataset, batch_size=2, shuffle=False, num_workers=4, collate_fn=collate)
-    test_loader = DataLoader(test_dataset, batch_size=2, shuffle=False, num_workers=4, collate_fn=collate)
+    val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False, num_workers=4, collate_fn=collate)
+    test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=4, collate_fn=collate)
 
     if model_name == "fasterrcnn_r50_fpn_v2":
         weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
         model = fasterrcnn_resnet50_fpn_v2(
             weights=weights,
-            min_size=1024,
-            max_size=1333,
+            min_size=640,
+            max_size=640,
             box_score_thresh=0.001,
             box_nms_thresh=0.70,
             box_detections_per_img=100,
@@ -380,8 +383,8 @@ def run_torchvision_detector(model_name: str, fold: int, seed: int, device: int,
         weights = RetinaNet_ResNet50_FPN_V2_Weights.DEFAULT
         model = retinanet_resnet50_fpn_v2(
             weights=weights,
-            min_size=1024,
-            max_size=1333,
+            min_size=640,
+            max_size=640,
             score_thresh=0.001,
             nms_thresh=0.70,
             detections_per_img=100,
@@ -398,8 +401,8 @@ def run_torchvision_detector(model_name: str, fold: int, seed: int, device: int,
         weights = FCOS_ResNet50_FPN_Weights.DEFAULT
         model = fcos_resnet50_fpn(
             weights=weights,
-            min_size=1024,
-            max_size=1333,
+            min_size=640,
+            max_size=640,
             score_thresh=0.001,
             nms_thresh=0.70,
             detections_per_img=100,
@@ -496,14 +499,15 @@ def run_torchvision_detector(model_name: str, fold: int, seed: int, device: int,
         "model": model_name,
         "model_family": model_family,
         "generic_pretraining": "COCO",
-        "rfdd_srd_training_data_used": True,
+        "rfs_srd_training_data_used": True,
         "fold": fold,
         "seed": seed,
         "device": device,
-        "image_min_size": 1024,
-        "image_max_size": 1333,
+        "image_min_size": 640,
+        "image_max_size": 640,
         "learning_rate": learning_rate,
         "mixed_precision": use_amp,
+        "batch_size": 8,
         "epochs_requested": 30,
         "epochs_completed": len(history),
         "best_epoch": best_epoch,
@@ -562,6 +566,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # Ultralytics selects its own logical cuda:0 after setting this physical ID.
+    # Torchvision receives logical cuda:0 directly. Both operate in the same
+    # one-GPU process namespace established before CUDA initialization.
+    physical_device = args.device
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(physical_device)
+    if args.model not in {"yolo11m", "yolov10m", "rtdetr_l"}:
+        args.device = 0
+
     CV_ROOT = args.root.resolve()
     if args.pretrained_dir is not None:
         pretrained_dir = args.pretrained_dir.resolve()
@@ -584,6 +596,7 @@ def main() -> None:
         metadata = run_ultralytics(args.model, args.fold, args.seed, args.device, run_dir)
     else:
         metadata = run_torchvision_detector(args.model, args.fold, args.seed, args.device, run_dir)
+    metadata["physical_gpu"] = physical_device
     completed_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"Completed {args.model} fold={args.fold} seed={args.seed}")
 

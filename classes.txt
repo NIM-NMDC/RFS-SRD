@@ -1,0 +1,6 @@
+Normal
+Deformed
+Inverted
+Fractured
+Missing
+Displaced

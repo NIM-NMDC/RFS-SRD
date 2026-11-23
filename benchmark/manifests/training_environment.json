@@ -1,0 +1,63 @@
+{
+  "torch": "2.1.0",
+  "torchvision": "0.16.0",
+  "ultralytics": "8.4.51",
+  "cuda": "12.1",
+  "weights": [
+    {
+      "filename": "yolo11m.pt",
+      "sha256": "d5ffc1a674953a08e11a8d21e022781b1b23a19b730afc309290bd9fb5305b95",
+      "pretrained_classes": 80
+    },
+    {
+      "filename": "yolov10m.pt",
+      "sha256": "6dc78f7a88591cec1e8716b8f5c7e3aefa9206684f025d202be34439ccb329a0",
+      "pretrained_classes": 80
+    },
+    {
+      "filename": "rtdetr-l.pt",
+      "sha256": "6de60b10d4bc566f00cda0f5b4d64afe4b66d48dc9695d2171effb7859d8e73f",
+      "pretrained_classes": 80
+    },
+    {
+      "filename": "fasterrcnn_resnet50_fpn_v2_coco-dd69338a.pth",
+      "sha256": "dd69338a24b8d7381807e247652bdc356325bcbaf1cd3e092e00e0a1a58706bf",
+      "source": "Official Torchvision COCO pretrained weights"
+    },
+    {
+      "filename": "retinanet_resnet50_fpn_v2_coco-5905b1c5.pth",
+      "sha256": "5905b1c544219215e544dbe319720397bc4e68de61a733a59350d7976645b769",
+      "source": "Official Torchvision COCO pretrained weights"
+    },
+    {
+      "filename": "fcos_resnet50_fpn_coco-99b0c9b7.pth",
+      "sha256": "99b0c9b7cfb1527d782db86b91d207f00547c792fb4103fc612b651d0a07b9e7",
+      "source": "Official Torchvision COCO pretrained weights"
+    }
+  ],
+  "python": "3.9.23",
+  "numpy": "1.26.4",
+  "pillow": "11.3.0",
+  "gpu_model": "Tesla V100S-PCIE-32GB",
+  "physical_gpu_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    7
+  ],
+  "excluded_gpu_indices": [
+    6
+  ],
+  "seeds": [
+    20261112,
+    20261113,
+    20261114
+  ],
+  "input_size": [
+    640,
+    640
+  ]
+}

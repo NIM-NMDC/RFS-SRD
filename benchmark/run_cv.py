@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -21,7 +22,7 @@ MODELS = [
     "retinanet_r50_fpn_v2",
     "fcos_r50_fpn",
 ]
-SEEDS = [20260908, 20260909, 20260910]
+SEEDS = [20261112, 20261113, 20261114]
 
 
 def main() -> None:
@@ -33,7 +34,7 @@ def main() -> None:
         default=ROOT,
         help="Experiment root containing splits/, runs/, and prepared dataset links/copies.",
     )
-    parser.add_argument("--gpus", default="0,1,2,3,4,5,6,7")
+    parser.add_argument("--gpus", default="0,1,2,3,4,5,7")
     parser.add_argument("--models", default=",".join(MODELS))
     parser.add_argument("--seeds", default=",".join(str(seed) for seed in SEEDS))
     parser.add_argument("--pretrained-dir", type=Path, default=None)
@@ -48,9 +49,9 @@ def main() -> None:
     logs.mkdir(parents=True, exist_ok=True)
     tasks = deque(
         (model, fold, seed)
-        for model in models
         for seed in seeds
         for fold in range(5)
+        for model in models
         if not (ROOT / "runs" / model / f"fold_{fold}_seed_{seed}" / "completed.json").is_file()
     )
     running: dict[int, tuple[subprocess.Popen, object, tuple[str, int, int], Path]] = {}
@@ -87,6 +88,7 @@ def main() -> None:
                 stdout=log_stream,
                 stderr=subprocess.STDOUT,
                 cwd=str(Path(__file__).resolve().parent),
+                env={**os.environ, "CUDA_VISIBLE_DEVICES": str(gpu)},
             )
             running[gpu] = (process, log_stream, (model, fold, seed), log_path)
             print(f"START gpu={gpu} model={model} fold={fold} seed={seed}", flush=True)
