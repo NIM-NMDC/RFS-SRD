@@ -23,6 +23,7 @@
 *.onnx
 *.engine
 *.png
+!/assets/RFS-SRD-cover.png
 *.jpg
 *.jpeg
 *.bmp

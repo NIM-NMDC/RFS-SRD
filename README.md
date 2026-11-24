@@ -8,6 +8,10 @@
 </p>
 
 <p align="center">
+  <img src="assets/RFS-SRD-cover.png" alt="RFS-SRD promotional cover featuring railway fasteners and automated inspection" width="100%">
+</p>
+
+<p align="center">
   <a href="https://doi.org/10.57760/sciencedb.35426"><img src="https://img.shields.io/badge/Data-ScienceDB-1877B5?style=flat-square" alt="Dataset on ScienceDB"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Code_License-MIT-2A7F62?style=flat-square" alt="Code license: MIT"></a>
   <a href="#benchmark"><img src="https://img.shields.io/badge/Benchmark-6_detectors_%C3%97_5_folds-7355A4?style=flat-square" alt="Benchmark: six detectors and five folds"></a>
@@ -218,6 +222,8 @@ RFS-SRD/
   LICENSE
   CHANGELOG.md
   classes.txt
+  assets/
+    RFS-SRD-cover.png
   benchmark/
     README.md
     requirements.txt
