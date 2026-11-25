@@ -244,6 +244,10 @@ The dataset archive also includes `benchmark/`. Both copies implement the same e
 
 Project code is distributed under the [MIT license](LICENSE). Third-party frameworks and pretrained weights retain their own licenses. Dataset access and reuse conditions are specified in the ScienceDB record. When using the data, cite [DOI: 10.57760/sciencedb.35426](https://doi.org/10.57760/sciencedb.35426).
 
+## 📧 Contact
+
+If you have any questions or encounter any issues, please contact [wangb@nim.ac.cn](mailto:wangb@nim.ac.cn).
+
 ---
 
 <p align="center">If RFS-SRD supports your research, please cite the dataset and consider starring this repository.</p>
